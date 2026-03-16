@@ -17,7 +17,7 @@ app.use(cors({
 const client = new OAuth2Client(
     process.env.GOOGLE_OAUTH_CLIENT_ID,
     process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-    'postmessage' // Required for exchanging frontend "code" via Google Identity Services
+    process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}/auth/callback` : 'http://localhost:3000/auth/callback' 
 );
 
 app.post('/api/auth/google', async (req, res) => {
@@ -53,8 +53,8 @@ app.post('/api/auth/google', async (req, res) => {
             const userData = userResult.rows[0];
 
             // Inform the DB who the user is for this transaction to satisfy RLS policies
-            await db.query(`SET LOCAL app.current_user = $1`, [userData.id]);
-
+// userData.id is the UUID string
+await db.query(`SET LOCAL "app.current_user" = '${userData.id}'`);
             // Upsert Profile data
             await db.query(
                 `INSERT INTO profiles (user_id, full_name, updated_at) 
@@ -82,8 +82,8 @@ app.post('/api/auth/google', async (req, res) => {
         }).json({ message: "Authenticated", user });
 
     } catch (error) {
-        console.error("Google Auth Error:", error.message);
-        res.status(401).json({ error: "Invalid Google Code or Server Error" });
+        console.error("Google Auth Error Full:", error);
+        res.status(401).json({ error: error.message || "Invalid Google Code or Server Error" });
     }
 });
 
