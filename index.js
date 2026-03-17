@@ -53,8 +53,8 @@ app.post('/api/auth/google', async (req, res) => {
             const userData = userResult.rows[0];
 
             // Inform the DB who the user is for this transaction to satisfy RLS policies
-// userData.id is the UUID string
-await db.query(`SET LOCAL "app.current_user" = '${userData.id}'`);
+            // userData.id is the UUID string
+            await db.query('SET LOCAL "app.current_user" = $1', [userData.id]);
             // Upsert Profile data
             await db.query(
                 `INSERT INTO profiles (user_id, full_name, updated_at) 
@@ -95,6 +95,48 @@ app.get("/", async (req, res) => {
     console.error(err);
     res.status(500).send("Database error");
   }
+});
+
+app.get('/api/auth/me', async (req, res) => {
+    const token = req.cookies.session;
+
+    if (!token) {
+        return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-me');
+        
+        // Fetch full user data to ensure they still exist and sync latest role
+        const result = await pool.query(
+            "SELECT id, email, role FROM users WHERE id = $1",
+            [decoded.userId]
+        );
+
+        if (result.rows.length === 0) {
+            // User was deleted but cookie still exists
+             res.clearCookie('session');
+             return res.status(401).json({ error: "User no longer exists" });
+        }
+
+        const user = result.rows[0];
+        
+        // Fetch profile data
+        const profileResult = await pool.query(
+            "SELECT full_name FROM profiles WHERE user_id = $1",
+            [user.id]
+        );
+        
+        if (profileResult.rows.length > 0) {
+            user.name = profileResult.rows[0].full_name;
+        }
+
+        res.json({ user });
+    } catch (error) {
+        console.error("Auth /me error:", error.message);
+        res.clearCookie('session');
+        res.status(401).json({ error: "Invalid or expired session" });
+    }
 });
 
 const PORT = process.env.PORT || 8001;
