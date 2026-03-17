@@ -139,6 +139,16 @@ app.get('/api/auth/me', async (req, res) => {
     }
 });
 
+app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('session', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'Lax',
+        path: '/'
+    });
+    res.json({ message: "Logged out successfully" });
+});
+
 const PORT = process.env.PORT || 8001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
