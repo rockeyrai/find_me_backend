@@ -16,6 +16,8 @@ app.use(cors({
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/post', require('./routes/post/normalPost'));
+app.use('/api/government-post', require('./routes/post/governmentPost'));
 
 // Health Check
 app.get("/", async (req, res) => {
